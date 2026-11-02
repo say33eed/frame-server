@@ -2,6 +2,7 @@
 const express = require("express");
 const { MongoClient, ObjectId } = require("mongodb");
 const { betterAuthMiddleware } = require("./betterAuth");
+const { createStudioCreateRouter } = require("./studioCreateRoute");
 
 const app = express();
 
@@ -175,6 +176,9 @@ app.get("/api/categories", (req, res) => {
     categories: STUDIO_CATEGORIES,
   });
 });
+
+// PRIVATE: CREATE STUDIO
+app.use("/api/studios", createStudioCreateRouter(getDatabase));
 
 // --------------------------------------------------
 // GET ALL STUDIOS
