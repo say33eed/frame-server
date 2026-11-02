@@ -1,6 +1,7 @@
 
 const express = require("express");
 const { MongoClient, ObjectId } = require("mongodb");
+const { betterAuthMiddleware } = require("./betterAuth");
 
 const app = express();
 
@@ -16,7 +17,9 @@ const STUDIO_CATEGORIES = [
   { name: "Workshop", slug: "workshop" },
 ];
 
-app.use(express.json());
+// --------------------------------------------------
+// CORS
+// --------------------------------------------------
 
 const allowedOrigins = new Set([
   "http://localhost:3000",
@@ -51,6 +54,10 @@ app.use((req, res, next) => {
 
   next();
 });
+
+// --------------------------------------------------
+// MONGODB CONNECTION
+// --------------------------------------------------
 
 let client = null;
 let databaseConnected = false;
@@ -98,7 +105,9 @@ async function getDatabase() {
 
   try {
     await client.db(DB_NAME).command({ ping: 1 });
+
     databaseConnected = true;
+
     return client.db(DB_NAME);
   } catch {
     databaseConnected = false;
@@ -130,6 +139,22 @@ function handleDatabaseError(res, error) {
   });
 }
 
+// --------------------------------------------------
+// BETTER AUTH
+// IMPORTANT: Mount BEFORE express.json()
+// --------------------------------------------------
+
+app.all("/api/auth/*path", (req, res) => {
+  return betterAuthMiddleware(req, res, getDatabase);
+});
+
+// JSON parsing for existing API routes.
+app.use(express.json({ limit: "1mb" }));
+
+// --------------------------------------------------
+// HEALTH CHECK
+// --------------------------------------------------
+
 app.get("/api/health", (req, res) => {
   res.status(200).json({
     success: true,
@@ -140,6 +165,10 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+// --------------------------------------------------
+// STUDIO CATEGORIES
+// --------------------------------------------------
+
 app.get("/api/categories", (req, res) => {
   res.status(200).json({
     success: true,
@@ -147,8 +176,12 @@ app.get("/api/categories", (req, res) => {
   });
 });
 
+// --------------------------------------------------
+// GET ALL STUDIOS
 // GET /api/studios
-// Optional example: /api/studios?category=photo-studio
+// GET /api/studios?category=photo-studio
+// --------------------------------------------------
+
 app.get("/api/studios", requireDatabase, async (req, res) => {
   try {
     const category = req.query.category;
@@ -182,7 +215,7 @@ app.get("/api/studios", requireDatabase, async (req, res) => {
       .sort({ createdAt: -1, _id: -1 })
       .toArray();
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       count: studios.length,
       studios,
@@ -192,8 +225,11 @@ app.get("/api/studios", requireDatabase, async (req, res) => {
   }
 });
 
-// GET /api/studios/featured
-// Assignment requirement: six newest studios using limit(6).
+// --------------------------------------------------
+// GET FEATURED STUDIOS
+// Six newest studios, required by assignment.
+// --------------------------------------------------
+
 app.get(
   "/api/studios/featured",
   requireDatabase,
@@ -206,7 +242,7 @@ app.get(
         .limit(6)
         .toArray();
 
-      res.status(200).json({
+      return res.status(200).json({
         success: true,
         count: studios.length,
         studios,
@@ -217,7 +253,10 @@ app.get(
   }
 );
 
-// GET /api/studios/:id
+// --------------------------------------------------
+// GET SINGLE STUDIO
+// --------------------------------------------------
+
 app.get(
   "/api/studios/:id",
   requireDatabase,
@@ -243,7 +282,7 @@ app.get(
         });
       }
 
-      res.status(200).json({
+      return res.status(200).json({
         success: true,
         studio,
       });
@@ -253,6 +292,10 @@ app.get(
   }
 );
 
+// --------------------------------------------------
+// GLOBAL ERROR HANDLER
+// --------------------------------------------------
+
 app.use((error, req, res, next) => {
   console.error("API error:", error);
 
@@ -260,11 +303,15 @@ app.use((error, req, res, next) => {
     return next(error);
   }
 
-  res.status(500).json({
+  return res.status(500).json({
     success: false,
     message: "An unexpected server error occurred.",
   });
 });
+
+// --------------------------------------------------
+// START SERVER
+// --------------------------------------------------
 
 app.listen(PORT, () => {
   console.log(`Frame API running on port ${PORT}`);
