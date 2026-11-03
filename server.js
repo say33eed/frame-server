@@ -3,6 +3,7 @@ const express = require("express");
 const { MongoClient, ObjectId } = require("mongodb");
 const { betterAuthMiddleware } = require("./betterAuth");
 const { createStudioCreateRouter } = require("./studioCreateRoute");
+const { createMyListingsRouter } = require("./myListingsRoute");
 
 const app = express();
 
@@ -151,6 +152,9 @@ app.all("/api/auth/*path", (req, res) => {
 
 // JSON parsing for existing API routes.
 app.use(express.json({ limit: "1mb" }));
+
+// PRIVATE: CURRENT HOST'S STUDIO LISTINGS
+app.use("/api/my-listings", createMyListingsRouter(getDatabase));
 
 // --------------------------------------------------
 // HEALTH CHECK
