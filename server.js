@@ -4,6 +4,7 @@ const { MongoClient, ObjectId } = require("mongodb");
 const { betterAuthMiddleware } = require("./betterAuth");
 const { createStudioCreateRouter } = require("./studioCreateRoute");
 const { createMyListingsRouter } = require("./myListingsRoute");
+const { createStudioEditRouter } = require("./studioEditRoute");
 
 const app = express();
 
@@ -152,6 +153,12 @@ app.all("/api/auth/*path", (req, res) => {
 
 // JSON parsing for existing API routes.
 app.use(express.json({ limit: "1mb" }));
+
+// PRIVATE: LOAD AND UPDATE OWNED STUDIOS
+app.use(
+  "/api/studios/manage",
+  createStudioEditRouter(getDatabase)
+);
 
 // PRIVATE: CURRENT HOST'S STUDIO LISTINGS
 app.use("/api/my-listings", createMyListingsRouter(getDatabase));
