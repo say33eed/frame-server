@@ -5,6 +5,7 @@ const { betterAuthMiddleware } = require("./betterAuth");
 const { createStudioCreateRouter } = require("./studioCreateRoute");
 const { createMyListingsRouter } = require("./myListingsRoute");
 const { createStudioEditRouter } = require("./studioEditRoute");
+const { createBookingRouter } = require("./bookingRoutes");
 
 const app = express();
 
@@ -153,6 +154,8 @@ app.all("/api/auth/*path", (req, res) => {
 
 // JSON parsing for existing API routes.
 app.use(express.json({ limit: "1mb" }));
+
+app.use("/api/bookings", createBookingRouter(getDatabase));
 
 // PRIVATE: LOAD AND UPDATE OWNED STUDIOS
 app.use(
