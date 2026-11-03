@@ -7,6 +7,9 @@ const { createMyListingsRouter } = require("./myListingsRoute");
 const { createStudioEditRouter } = require("./studioEditRoute");
 const { createBookingRouter } = require("./bookingRoutes");
 
+const { createSecurityRouter, requireMutationJWT, requireTrustedOrigin } = require("./mutationSecurity");
+
+const { createNewsletterRouter } = require("./newsletterRoute");
 const app = express();
 
 const PORT = Number(process.env.PORT) || 5000;
@@ -154,6 +157,21 @@ app.all("/api/auth/*path", (req, res) => {
 
 // JSON parsing for existing API routes.
 app.use(express.json({ limit: "1mb" }));
+app.use("/api/newsletter", createNewsletterRouter(getDatabase));
+
+// Issue a short-lived JWT only after verifying a real Better Auth session.
+app.use("/api/security", createSecurityRouter(getDatabase));
+
+// Protect every studio/booking mutation without changing public reads.
+app.use((req, res, next) => {
+  const path = req.path;
+  const isMutation = ["POST", "PUT", "PATCH", "DELETE"].includes(req.method);
+  const protectedPath = path === "/api/studios" || path.startsWith("/api/studios/") ||
+    path === "/api/bookings" || path.startsWith("/api/bookings/");
+  if (!isMutation || !protectedPath) return next();
+  return requireTrustedOrigin(req, res, () =>
+    requireMutationJWT(getDatabase)(req, res, next));
+});
 
 app.use("/api/bookings", createBookingRouter(getDatabase));
 
