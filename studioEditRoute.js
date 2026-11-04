@@ -121,6 +121,16 @@ function createStudioEditRouter(getDatabase) {
                 ? body.imageUrl.trim()
                 : "";
 
+        const images = Array.isArray(body.images)
+            ? [...new Set(body.images.map((value) => typeof value === "string" ? value.trim() : "").filter(Boolean))]
+            : (imageUrl ? [imageUrl] : []);
+        if (images.length > 10 || images.some((value) => {
+            try { return !["http:", "https:"].includes(new URL(value).protocol); }
+            catch { return true; }
+        })) {
+            return { error: "Provide up to 10 valid gallery image URLs." };
+        }
+        const studioImages = [...new Set([imageUrl, ...images].filter(Boolean))];
         const pricePerHour = Number(body.pricePerHour);
         const securityDeposit = Number(body.securityDeposit);
         const maxCapacity = Number(body.maxCapacity);
@@ -234,7 +244,7 @@ function createStudioEditRouter(getDatabase) {
                 overview,
                 description: overview,
                 imageUrl,
-                images: imageUrl ? [imageUrl] : [],
+                images: studioImages,
                 pricePerHour,
                 securityDeposit,
                 maxCapacity,
