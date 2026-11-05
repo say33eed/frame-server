@@ -6,6 +6,7 @@ const { createStudioCreateRouter } = require("./studioCreateRoute");
 const { createMyListingsRouter } = require("./myListingsRoute");
 const { createStudioEditRouter } = require("./studioEditRoute");
 const { createBookingRouter } = require("./bookingRoutes");
+const { createInvoiceRouter } = require("./invoiceRoute");
 const { createWishlistRouter } = require("./wishlistRoute");
 
 const {
@@ -576,6 +577,9 @@ app.use(
   "/api/bookings",
   createBookingRouter(getDatabase)
 );
+
+// Authenticated PDF invoices for confirmed bookings.
+app.use("/api/bookings", createInvoiceRouter(getDatabase));
 
 // PRIVATE: LOAD AND UPDATE OWNED STUDIOS
 app.use(
