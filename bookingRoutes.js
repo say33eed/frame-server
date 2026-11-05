@@ -2,6 +2,7 @@
 const express = require("express");
 const { ObjectId } = require("mongodb");
 const { getBetterAuth } = require("./betterAuth");
+const { bookingInstant, displayBooking } = require("./bookingTime");
 
 function createBookingRouter(getDatabase) {
     const router = express.Router();
@@ -106,7 +107,7 @@ function createBookingRouter(getDatabase) {
                 });
             }
 
-            const requestedStart = new Date(`${date}T${startTime}:00Z`);
+            const requestedStart = new Date(bookingInstant(date, startTime));
 
             if (requestedStart.getTime() <= Date.now()) {
                 return res.status(400).json({
@@ -242,7 +243,7 @@ function createBookingRouter(getDatabase) {
             res.json({
                 success: true,
                 count: bookings.length,
-                bookings,
+                bookings: bookings.map(booking => displayBooking(booking)),
             });
         } catch (error) {
             console.error("My bookings:", error.message);
@@ -269,14 +270,16 @@ function createBookingRouter(getDatabase) {
                 .find({ studioId: { $in: studios.map(studio => studio._id) } })
                 .sort({ createdAt: -1 }).limit(200).toArray();
             return res.json({ success: true, count: bookings.length,
-                bookings: bookings.map(booking => ({
+                bookings: bookings.map(rawBooking => {
+                    const booking = displayBooking(rawBooking);
+                    return ({
                     _id: booking._id, studioId: booking.studioId,
                     studioTitle: titles.get(String(booking.studioId)) || booking.studioTitle,
                     date: booking.date, startTime: booking.startTime, endTime: booking.endTime,
                     crewCount: booking.crewCount, total: booking.total,
                     userEmail: booking.userEmail, notes: booking.notes,
                     status: booking.status, createdAt: booking.createdAt,
-                })) });
+                }); }) });
         } catch (error) {
             console.error("Host booking inbox:", error.message);
             return res.status(503).json({ success: false, message: "Unable to load incoming booking requests." });
@@ -328,7 +331,7 @@ function createBookingRouter(getDatabase) {
                     success: false, message: "Another request for this studio is being processed. Please refresh shortly.",
                 });
                 lockedStudioId = studio._id;
-                const start = new Date(`${booking.date}T${booking.startTime}:00Z`);
+                const start = new Date(bookingInstant(booking.date, booking.startTime));
                 if (!Number.isFinite(start.getTime()) || start.getTime() <= Date.now()) {
                     return res.status(409).json({ success: false, message: "This booking slot is in the past and cannot be confirmed." });
                 }

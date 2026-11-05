@@ -2,6 +2,7 @@
 const express = require("express");
 const { ObjectId } = require("mongodb");
 const { getBetterAuth } = require("./betterAuth");
+const { bookingInstant } = require("./bookingTime");
 
 function createReviewRouter(getDatabase) {
   const router = express.Router();
@@ -32,7 +33,7 @@ function createReviewRouter(getDatabase) {
 
   function bookingEnd(booking) {
     if (typeof booking.date !== "string" || typeof booking.endTime !== "string") return NaN;
-    return Date.parse(`${booking.date}T${booking.endTime}:00Z`);
+    return bookingInstant(booking.date, booking.endTime);
   }
 
   async function eligibleBooking(db, studioId, userId) {

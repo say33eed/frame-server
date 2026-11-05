@@ -28,7 +28,7 @@ function createInvoicePdf(booking, user) {
   lines.push(textAt(420, 760, 15, "BOOKING INVOICE", "1 1 1"));
   lines.push(textAt(45, 708, 10, `Invoice reference: FR-${id.slice(-10)}`));
   lines.push(textAt(45, 690, 10, `Booking ID: ${id}`));
-  lines.push(textAt(45, 672, 10, `Issued: ${new Date().toISOString().slice(0, 10)}`));
+  lines.push(textAt(45, 672, 10, `Issued: ${new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Dhaka", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date())}`));
   lines.push(textAt(45, 640, 12, "BILLED TO", "0.9 0 0.14"));
   lines.push(textAt(45, 621, 11, user.name || "Frame customer"));
   lines.push(textAt(45, 603, 10, user.email || booking.userEmail || ""));
@@ -105,7 +105,7 @@ function createInvoiceRouter(getDatabase) {
       if (!booking) {
         return res.status(404).json({ success: false, message: "Booking not found." });
       }
-      if (booking.status !== "Confirmed") {
+      if (!["Confirmed", "Completed"].includes(booking.status)) {
         return res.status(409).json({ success: false, message: "Invoices are available only for confirmed bookings." });
       }
       const pdf = createInvoicePdf(booking, session.user);
