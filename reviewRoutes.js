@@ -92,8 +92,17 @@ function createReviewRouter(getDatabase) {
       const reviews = await db.collection("reviews").find({ studioId })
         .sort({ createdAt: -1, _id: -1 }).limit(200).toArray();
       const verified = await verifiedUsers(db, studioId, [...new Set(reviews.map((r) => r.userId))]);
+      // Resolve profile photos from Better Auth users, including reviews written before this feature.
+      const authorIds = [...new Set(reviews.map((review) => review.userId).filter(Boolean))];
+      const authors = authorIds.length
+        ? await db.collection("user").find({ $or: [{ id: { $in: authorIds } }, { _id: { $in: authorIds } }] })
+            .project({ id: 1, image: 1 }).toArray()
+        : [];
+      const authorImages = new Map(authors.map((author) => [String(author.id || author._id), author.image || null]));
       const visibleReviews = reviews.map((review) => ({
-        ...review, usedStudio: verified.has(review.userId),
+        ...review,
+        usedStudio: verified.has(review.userId),
+        image: authorImages.get(review.userId) || review.image || null,
       }));
       const summary = await db.collection("reviews").aggregate([
         { $match: { studioId } },
