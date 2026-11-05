@@ -6,6 +6,7 @@ const { createStudioCreateRouter } = require("./studioCreateRoute");
 const { createMyListingsRouter } = require("./myListingsRoute");
 const { createStudioEditRouter } = require("./studioEditRoute");
 const { createBookingRouter } = require("./bookingRoutes");
+const { createWishlistRouter } = require("./wishlistRoute");
 
 const {
   createSecurityRouter,
@@ -557,7 +558,8 @@ app.use((req, res, next) => {
     path === "/api/studios" ||
     path.startsWith("/api/studios/") ||
     path === "/api/bookings" ||
-    path.startsWith("/api/bookings/");
+    path.startsWith("/api/bookings/") ||
+    path.startsWith("/api/wishlist/");
 
   if (!isMutation || !protectedPath) {
     return next();
@@ -567,6 +569,8 @@ app.use((req, res, next) => {
     requireMutationJWT(getDatabase)(req, res, next)
   );
 });
+
+app.use("/api/wishlist", createWishlistRouter(getDatabase));
 
 app.use(
   "/api/bookings",
