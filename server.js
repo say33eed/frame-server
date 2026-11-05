@@ -8,6 +8,7 @@ const { createStudioEditRouter } = require("./studioEditRoute");
 const { createBookingRouter } = require("./bookingRoutes");
 const { createInvoiceRouter } = require("./invoiceRoute");
 const { createWishlistRouter } = require("./wishlistRoute");
+const { createReviewRouter } = require("./reviewRoutes");
 
 const {
   createSecurityRouter,
@@ -560,7 +561,8 @@ app.use((req, res, next) => {
     path.startsWith("/api/studios/") ||
     path === "/api/bookings" ||
     path.startsWith("/api/bookings/") ||
-    path.startsWith("/api/wishlist/");
+    path.startsWith("/api/wishlist/") ||
+    path.startsWith("/api/reviews/");
 
   if (!isMutation || !protectedPath) {
     return next();
@@ -572,6 +574,9 @@ app.use((req, res, next) => {
 });
 
 app.use("/api/wishlist", createWishlistRouter(getDatabase));
+
+// Verified-booking reviews; mutations use the same JWT/origin protections.
+app.use("/api/reviews", createReviewRouter(getDatabase));
 
 app.use(
   "/api/bookings",
@@ -667,6 +672,9 @@ app.get(
         .sort({ createdAt: -1, _id: -1 })
         .toArray();
 
+      for (const studio of studios) {
+        if (!(Number(studio.reviewCount) > 0 && Number(studio.rating) > 0)) studio.rating = null;
+      }
       return res.status(200).json({
         success: true,
         count: studios.length,
@@ -695,6 +703,9 @@ app.get(
         .limit(6)
         .toArray();
 
+      for (const studio of studios) {
+        if (!(Number(studio.reviewCount) > 0 && Number(studio.rating) > 0)) studio.rating = null;
+      }
       return res.status(200).json({
         success: true,
         count: studios.length,
@@ -735,6 +746,7 @@ app.get(
         });
       }
 
+      if (!(Number(studio.reviewCount) > 0 && Number(studio.rating) > 0)) studio.rating = null;
       return res.status(200).json({
         success: true,
         studio,

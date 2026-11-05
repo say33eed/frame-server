@@ -220,7 +220,7 @@ function createStudioCreateRouter(getDatabase) {
         hostImage: session.user.image || "",
 
         currency: "USD",
-        rating: 0,
+        rating: null,
         reviewCount: 0,
         createdAt: now,
         updatedAt: now,
