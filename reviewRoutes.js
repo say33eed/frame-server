@@ -25,12 +25,6 @@ function createReviewRouter(getDatabase) {
     }
   }
 
-  function isHost(studio, user) {
-    return studio.hostId === user.id ||
-      (!studio.hostId && Boolean(user.email) &&
-        (studio.hostEmail === user.email || studio.ownerEmail === user.email));
-  }
-
   function bookingEnd(booking) {
     if (typeof booking.date !== "string" || typeof booking.endTime !== "string") return NaN;
     return bookingInstant(booking.date, booking.endTime);
@@ -41,6 +35,22 @@ function createReviewRouter(getDatabase) {
       studioId, userId, status: { $in: ["Confirmed", "Completed"] },
     }).project({ date: 1, endTime: 1 }).toArray();
     return bookings.some((booking) => Number.isFinite(bookingEnd(booking)) && bookingEnd(booking) <= Date.now());
+  }
+
+  // Verified use is computed from server-owned bookings, never from review input.
+  // A confirmed reservation qualifies only after its Bangladesh-local end time.
+  async function verifiedUsers(db, studioId, userIds) {
+    if (!userIds.length) return new Set();
+    const bookings = await db.collection("bookings").find({
+      studioId,
+      userId: { $in: userIds },
+      status: { $in: ["Confirmed", "Completed"] },
+    }).project({ userId: 1, date: 1, endTime: 1 }).toArray();
+    const now = Date.now();
+    return new Set(bookings.filter((booking) => {
+      const end = bookingEnd(booking);
+      return Number.isFinite(end) && end <= now;
+    }).map((booking) => booking.userId));
   }
 
   function parseReview(body) {
@@ -81,11 +91,15 @@ function createReviewRouter(getDatabase) {
       if (!studio) return fail(res, 404, "Studio not found.");
       const reviews = await db.collection("reviews").find({ studioId })
         .sort({ createdAt: -1, _id: -1 }).limit(200).toArray();
+      const verified = await verifiedUsers(db, studioId, [...new Set(reviews.map((r) => r.userId))]);
+      const visibleReviews = reviews.map((review) => ({
+        ...review, usedStudio: verified.has(review.userId),
+      }));
       const summary = await db.collection("reviews").aggregate([
         { $match: { studioId } },
         { $group: { _id: null, reviewCount: { $sum: 1 }, rating: { $avg: "$rating" } } },
       ]).toArray();
-      return res.json({ success: true, reviews, reviewCount: summary[0]?.reviewCount ?? 0,
+      return res.json({ success: true, reviews: visibleReviews, reviewCount: summary[0]?.reviewCount ?? 0,
         rating: summary[0] ? Math.round(summary[0].rating * 10) / 10 : null });
     } catch (error) {
       console.error("List reviews:", error.message);
@@ -101,8 +115,9 @@ function createReviewRouter(getDatabase) {
       const studio = await db.collection("studios").findOne({ _id: studioId });
       if (!studio) return fail(res, 404, "Studio not found.");
       const existing = await db.collection("reviews").findOne({ studioId, userId: req.reviewUser.id });
-      const eligible = !isHost(studio, req.reviewUser) && await eligibleBooking(db, studioId, req.reviewUser.id);
-      return res.json({ success: true, eligible, myReview: existing ?? null });
+      const eligible = true;
+      const usedStudio = await eligibleBooking(db, studioId, req.reviewUser.id);
+      return res.json({ success: true, eligible, usedStudio, myReview: existing ?? null });
     } catch (error) {
       console.error("Review eligibility:", error.message);
       return fail(res, 503, "Unable to check review eligibility.");
@@ -118,9 +133,6 @@ function createReviewRouter(getDatabase) {
       const studioId = new ObjectId(req.params.studioId);
       const studio = await db.collection("studios").findOne({ _id: studioId });
       if (!studio) return fail(res, 404, "Studio not found.");
-      if (isHost(studio, req.reviewUser)) return fail(res, 403, "Hosts cannot review their own studios.");
-      if (!(await eligibleBooking(db, studioId, req.reviewUser.id)))
-        return fail(res, 403, "You can review this studio after your confirmed booking has ended.");
       await ensureIndex(db);
       const now = new Date();
       const review = { studioId, userId: req.reviewUser.id,
@@ -128,7 +140,8 @@ function createReviewRouter(getDatabase) {
         createdAt: now, updatedAt: now };
       const result = await db.collection("reviews").insertOne(review);
       await updateSummary(db, studioId);
-      return res.status(201).json({ success: true, review: { ...review, _id: result.insertedId } });
+      const usedStudio = await eligibleBooking(db, studioId, req.reviewUser.id);
+      return res.status(201).json({ success: true, review: { ...review, _id: result.insertedId, usedStudio } });
     } catch (error) {
       if (error.code === 11000) return fail(res, 409, "You already reviewed this studio. Edit your existing review instead.");
       console.error("Create review:", error.message);
